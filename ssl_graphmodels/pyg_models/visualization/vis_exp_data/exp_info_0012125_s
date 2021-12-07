@@ -1,7 +1,0 @@
-word1	word2	layer	weight
-bauxite	cargo	1	0.9999999
-bauxite	carrying	1	0.9999999
-bauxite	dw	1	0.9999999
-bauxite	bauxite	1	0.9935748
-bauxite	envoy	1	0.9999999
-service	bauxite	2	0.9999999
