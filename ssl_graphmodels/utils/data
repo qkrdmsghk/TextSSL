@@ -1,0 +1,61 @@
+best_test_acc	methods	type	num_layer	Name
+0.692555	gnn		1	ohsumed
+0.686371	gnn		2	ohsumed
+0.68835	gnn		3	ohsumed
+0.713332	gnn_note		1	ohsumed
+0.713579	gnn_note		2	ohsumed
+0.706901	gnn_note		3	ohsumed
+0.689834	gnn_note	inter_only	1	ohsumed
+0.69676	gnn_note	inter_only	2	ohsumed
+0.690576	gnn_note	inter_only	3	ohsumed
+0.688598	gnn_note	inter_all	1	ohsumed
+0.680188	gnn_note	inter_all	2	ohsumed
+0.665595	gnn_note	inter_all	3	ohsumed
+0.70047	two_tower	share	1	ohsumed
+0.697749	two_tower	share	2	ohsumed
+0.68835	two_tower	share	3	ohsumed
+0.97078	gnn		1	R8
+0.975342	gnn		2	R8
+0.9758	gnn		3	R8
+0.973973	gnn_note		1	R8
+0.972146	gnn_note		2	R8
+0.969863	gnn_note		3	R8
+0.974429	gnn_note	inter_only	1	R8
+0.977169	gnn_note	inter_only	2	R8
+0.966667	gnn_note	inter_only	3	R8
+0.976256	gnn_note	inter_all	1	R8
+0.971233	gnn_note	inter_all	2	R8
+0.974429	gnn_note	inter_all	3	R8
+0.970776	two_tower	share	1	R8
+0.97169	two_tower	share	2	R8
+0.96895	two_tower	share	3	R8
+0.947471	gnn		1	R52
+0.945914	gnn		2	R52
+0.945525	gnn		3	R52
+0.95214	gnn_note		1	R52
+0.952529	gnn_note		2	R52
+0.954864	gnn_note		3	R52
+0.951362	gnn_note	inter_only	1	R52
+0.953307	gnn_note	inter_only	2	R52
+0.947082	gnn_note	inter_only	3	R52
+0.945914	gnn_note	inter_all	1	R52
+0.952529	gnn_note	inter_all	2	R52
+0.946693	gnn_note	inter_all	3	R52
+0.952529	two_tower	share	1	R52
+0.948249	two_tower	share	2	R52
+0.952529	two_tower	share	3	R52
+0.850106	gnn		1	20ng
+0.851567	gnn		2	20ng
+0.853956	gnn		3	20ng
+0.840149	gnn_note		1	20ng
+0.857939	gnn_note		2	20ng
+0.851832	gnn_note		3	20ng
+0.853425	gnn_note	inter_only	1	20ng
+0.851434	gnn_note	inter_only	2	20ng
+0.850106	gnn_note	inter_only	3	20ng
+0.836962	gnn_note	inter_all	1	20ng
+0.830457	gnn_note	inter_all	2	20ng
+0.835369	gnn_note	inter_all	3	20ng
+0.841476	two_tower	share	1	20ng
+0.849442	two_tower	share	2	20ng
+0.860196	two_tower	share	3	20ng
