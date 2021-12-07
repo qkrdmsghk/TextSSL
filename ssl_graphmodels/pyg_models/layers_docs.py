@@ -3,22 +3,16 @@ from torch_geometric.nn.inits import glorot, zeros, reset
 from torch.nn import Parameter
 from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_pool
 import sys
-sys.path.append('/data/project/yinhuapark/scripts/models/ssl/ssl_graphmodels')
+sys.path.append('../ssl_graphmodels')
 from utils.ATGCConv_GCN import ATGCConv_GCN, GINConv, GATConv, CombConv_GCN, LEConv, GCNConv
-from utils.enhwa_utils import transform_note_batch, split_and_pad_to_seq
 from torch.nn import Sequential as Seq, Linear as Lin
 from torch_geometric.nn import BatchNorm as BN
-from utils.sparse_softmax import Sparsemax
-from torch_geometric.utils import softmax, dense_to_sparse, add_remaining_self_loops
-from torch_scatter import scatter, segment_csr, gather_csr
-from torch_geometric.nn.norm import GraphNorm
+from torch_geometric.utils import softmax, add_remaining_self_loops
 
 
 def statistic(edge_weights, temperature, weightss, thresholds):
     sample_prob = torch.distributions.relaxed_bernoulli.RelaxedBernoulli(temperature, probs=weightss)
     y = sample_prob.rsample()
-    # plot(weights[edge_weight==0].detach().cpu(),weights[edge_weight==1].detach().cpu(), title=self.sparse)
-    # plot(y[edge_weight==0].detach().cpu(),y[edge_weight==1].detach().cpu(), title=self.sparse)
     y_soft = y
     y_hard = (y > thresholds).to(y.dtype)
     y = (y_hard - y).detach() + y
@@ -73,49 +67,26 @@ class StructureLearinng(torch.nn.Module):
 
         edge_mask = edge_mask[col_id]
 
-        # import matplotlib.pyplot as plt
-        # def plot(inter, intra, title):
-        #     if inter != None:
-        #         plt.hist(inter, label='inter')
-        #     if intra != None:
-        #         plt.hist(intra, label='intra')
-        #     plt.title(title)
-        #     plt.legend()
-        #     plt.show()
-
         if self.sparse == 'sparse_hard':
             edge_weight = self.sparse_attention(weights, col)
         elif self.sparse == 'soft':
             edge_weight = softmax(weights, col)
         elif 'gumbel' in self.sparse:
-            # plot(weights[edge_weight==0].detach().cpu(),weights[edge_weight==1].detach().cpu(), title='raw edges')
             if self.sparse == 'gumbel_hard':
                 weights = softmax(weights, col)
             elif self.sparse == 'gumbel_hard_sig':
                 weights = torch.sigmoid(weights)
 
-            # statistic(edge_weight, self.temperature, weights, self.threshold)
             sample_prob = torch.distributions.relaxed_bernoulli.RelaxedBernoulli(self.temperature, probs=weights)
             y = sample_prob.rsample()
-            # plot(weights[edge_weight==0].detach().cpu(),weights[edge_weight==1].detach().cpu(), title=self.sparse)
-            # plot(y[edge_weight==0].detach().cpu(),y[edge_weight==1].detach().cpu(), title=self.sparse)
             y_soft = y
             y_hard = (y>self.threshold).to(y.dtype)
             y = (y_hard - y).detach() + y
             intra_edges = y[edge_weight == 1]
             inter_edges = y[edge_weight == 0]
-
-            # print('added inter_edges #{}'.format((inter_edges[inter_edges==1].shape[0]) / (inter_edges.shape[0])))
-            # print('removed intra_edges #{}'.format((intra_edges[intra_edges==0].shape[0]) / (intra_edges.shape[0])))
-
             edge_weight[edge_weight==0] = inter_edges
             edge_mask[(edge_mask==0) & (y==1)] = layer+1
-            # print('final added edges #{}'.format((edge_weight[edge_weight==1].shape[0]-raw_edges) / raw_edges))
             intra_soft_edge = y_soft[edge_mask==-1]
-
-            # intra_soft_edge = softmax(intra_soft_edge, col[edge_mask==-1])
-            # plt.hist(intra_soft_edge.detach().cpu())
-            # plt.show()
 
         assert edge_index.size(1) == edge_weight.size(0)
 
@@ -161,26 +132,7 @@ class GRAPHLayer(torch.nn.Module):
                 self.Lin = True
             else:
                 self.Lin = False
-
-            if 'gin' in self.func:
-                self.convs.append(GINConv(Seq(Lin(output_dim, output_dim), BN(output_dim), torch.nn.ReLU())))
-            elif 'gat' in self.func:
-                self.convs.append(GATConv(output_dim, output_dim, heads=1))
-            elif 'gcn' in self.func:
-                self.convs.append(GCNConv(output_dim, output_dim))
-            elif 'LE' in self.func:
-                self.convs.append(LEConv(output_dim, output_dim))
-            elif 'comb' in self.func:
-                alpha = 0.
-                share = False
-                if 'comb_aug' in self.func:
-                    alpha = 1.
-                if 'share' in self.func:
-                    share = True
-                self.convs.append(CombConv_GCN(output_dim, output_dim, alpha, share))
-
-            else:
-                self.convs.append(ATGCConv_GCN(output_dim, output_dim, improved = self.improved, Lin=self.Lin))
+            self.convs.append(ATGCConv_GCN(output_dim, output_dim, improved = self.improved, Lin=self.Lin))
 
             emb_type = '1_hop'
             if 'attn' in self.func:
@@ -188,51 +140,25 @@ class GRAPHLayer(torch.nn.Module):
                     sparse = 'soft'
                 elif 'mine' in self.func:
                     sparse = 'gumbel_hard'
-                    if '2_hop' in self.func:
-                        emb_type = '2_hop'
-                elif 'sigmoid' in self.func:
-                    sparse = 'gumbel_hard_sig'
                 else:
                     sparse = 'sparse_hard'
                 self.sls.append(StructureLearinng(output_dim, sparse, emb_type, self.threshold, self.temperature))
-
                 torch.cuda.empty_cache()
-
-            # else:
-            #     print('variant gcn_{} is not available'.format(self.gnn_type))
 
         self.reset_parameters()
 
     def reset_parameters(self):
         glorot(self.weight)
         zeros(self.bias)
-        # glorot(self.lin.weight)
-        # zeros(self.lin.bias)
 
     def forward(self, input, **kwargs):
         x = input
         batch = kwargs['batch']
         edge_index = kwargs['edge_index']
 
-        '''
-        update on 08/21/2021
-        encoding module: {
-            dropout,
-            encode --> dense layer,
-            dropout
-            }
-        '''
-
         x = torch.nn.functional.dropout(x, self.dropout, training=self.training)
         x = self.act(torch.matmul(x, self.weight) + self.bias)
         x = torch.nn.functional.dropout(x, self.dropout, training=self.training)
-
-        '''
-        update on 08/21/2021
-        GNN module: {
-            GNN conv 
-            }*num_layers
-        '''
 
         if 'attn' in self.func:
 
@@ -253,12 +179,8 @@ class GRAPHLayer(torch.nn.Module):
             inter_edge_indexs = []
             edge_masks = []
             for i in range(self.num_layer):
-                if 'gin' in self.func:
-                    x = self.act(self.convs[i](x, edge_index[:, edge_weight!=0]))
-                elif 'comb' in self.func:
-                    x = self.act(self.convs[i](x, edge_index[:, edge_weight!=0], edge_weight=edge_weight[edge_weight!=0], edge_mask=edge_mask[edge_weight!=0]))
-                else:
-                    x = self.act(self.convs[i](x, edge_index[:, edge_weight!=0], edge_weight=edge_weight[edge_weight!=0]))
+
+                x = self.act(self.convs[i](x, edge_index[:, edge_weight!=0], edge_weight=edge_weight[edge_weight!=0]))
 
                 if i != self.num_layer-1:
                     edge_index, edge_weight, soft_weight, edge_mask, intra_soft_edge = self.sls[i](x, edge_index, edge_weight, edge_mask, layer=i)
@@ -271,10 +193,6 @@ class GRAPHLayer(torch.nn.Module):
                     log_p = torch.log(raw_edge_intra_weight + 1e-12)
                     log_q = torch.log(intra_soft_edge+ 1e-12)
                     self.kl_terms.append(torch.mean(raw_edge_intra_weight * (log_p - log_q)))
-                    # print(torch.mean(raw_edge_intra_weight * (log_p - log_q)))
-                    # raw_edge_intra_weight = intra_soft_edge
-            # added_edge = (edge_weight[edge_weight != 0].size(0)-raw_size)/raw_size
-            # print('added_edges_{}'.format(added_edge))
 
             if 'explain' in kwargs:
                 soft_weights = torch.cat(soft_weights)
@@ -286,8 +204,6 @@ class GRAPHLayer(torch.nn.Module):
                 return x, exp_dict
             else:
                 return x
-
-
 
         else:
             # gnn
@@ -312,8 +228,7 @@ class DENSELayer(torch.nn.Module):
     def reset_parameters(self):
         glorot(self.weight)
         zeros(self.bias)
-        # glorot(self.lin.weight)
-        # zeros(self.lin.bias)
+
 
     def forward(self, input, **kwargs):
         x = input
@@ -321,7 +236,6 @@ class DENSELayer(torch.nn.Module):
         x = torch.nn.functional.dropout(x, 0.7, training=self.training)
         # dense encode
         x = self.act(torch.matmul(x, self.weight) + self.bias)
-        # x = torch.nn.functional.dropout(x, 0.5, training=self.training)
 
         return x
 
@@ -380,17 +294,7 @@ class READOUTLayer(torch.nn.Module):
 
     def forward(self, input=None, **kwargs):
 
-        # if 'note' in self.func:
-        #     x = input
-        #     batch = kwargs['batch']
-        #     # embedding
-        #     x = self.act(torch.matmul(x, self.emb_weight) + self.emb_bias)
-        #
-        #     batch_n = kwargs['batch_n']
-        #     x_n_batch_ = transform_note_batch(batch_n, batch)
-        #     x = global_add_pool(x, x_n_batch_)
-        #     x, seq_lens = split_and_pad_to_seq(x, batch_n, batch)
-        #     x = torch.sum(x, dim=1)
+
 
         if self.func == 'two_tower':
             x_n = kwargs['x_n']

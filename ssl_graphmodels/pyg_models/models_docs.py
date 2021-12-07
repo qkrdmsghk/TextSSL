@@ -1,7 +1,5 @@
 import sys, os
-# sys.path.append('/data/project/yinhuapark/scripts/models/data_utils')
-# sys.path.append('/data/project/yinhuapark/scripts/models/mimic3')
-sys.path.append('/data/project/yinhuapark/scripts/models/ssl/ssl_graphmodels')
+sys.path.append('../ssl_graphmodels')
 
 import torch
 from utils.ATGCConv_GCN import *
@@ -43,53 +41,6 @@ class DocNet(torch.nn.Module):
                                         dropout=self.params['dropout'],
                                         act=torch.nn.ReLU(),
                                         aggr=self.params['aggregate']))
-    def gnn_build_bert(self):
-        self.layers.append(DENSELayer(self.params['input_dim'],
-                                      self.params['hidden_dim'],
-                                      dropout=self.params['dropout'],
-                                      act=torch.nn.ReLU(),
-                                      bias=True
-        ))
-        self.layers.append(GRAPHLayer(self.params['hidden_dim'],
-                                      self.params['hidden_dim'],
-                                      dropout=self.params['dropout'],
-                                      act=torch.nn.ReLU(),
-                                      bias=True,
-                                      func = self.func,
-                                      num_layer=self.params['num_layer'],
-                                      temperature=self.params['temperature'],
-                                      threshold=self.params['threshold']
-                                      ))
-        self.layers.append(READOUTLayer(self.params['hidden_dim'],
-                                        self.params['output_dim'],
-                                        func=self.func,
-                                        dropout=self.params['dropout'],
-                                        act=torch.nn.ReLU(),
-                                        aggr=self.params['aggregate']))
-    def two_tower_build(self):
-        self.layers.append(GRAPHLayer(self.params['input_dim'],
-                                      self.params['hidden_dim'],
-                                      dropout=self.params['dropout'],
-                                      act=torch.nn.ReLU(),
-                                      bias=True,
-                                      func = self.func,
-                                      num_layer=self.params['num_layer']
-                                      ))
-        self.layers.append(GRAPHLayer(self.params['input_dim'],
-                                      self.params['hidden_dim'],
-                                      dropout=self.params['dropout'],
-                                      act=torch.nn.ReLU(),
-                                      bias=True,
-                                      func = self.func,
-                                      num_layer=self.params['num_layer']
-                                      ))
-        self.layers.append(READOUTLayer(self.params['hidden_dim'],
-                                        self.params['output_dim'],
-                                        func=self.func,
-                                        dropout=self.params['dropout'],
-                                        act=torch.nn.ReLU(),
-                                        aggr=self.params['aggregate']
-                                        ))
 
     def mlp_build(self):
 
@@ -117,16 +68,6 @@ class DocNet(torch.nn.Module):
                 hidden_emb = self.layers[0](data.x_n, edge_index=data.edge_index_n, batch=data.x_n_batch)
             for layer in self.layers:
                 output = layer(output, edge_index=data.edge_index_n, batch=data.x_n_batch, batch_n=data.batch_n)
-
-        elif self.func == 'two_tower':
-            if self.type == 'share':
-                x_p = self.layers[0](data.x_p, edge_index=data.edge_index_p, batch=data.x_p_batch)
-                x_n = self.layers[0](data.x_n, edge_index=data.edge_index_n, batch=data.x_n_batch)
-                output = self.layers[2](x_n=x_n, x_p=x_p, x_n_batch=data.x_n_batch, x_p_batch=data.x_p_batch)
-            else:
-                x_p = self.layers[0](data.x_p, edge_index=data.edge_index_p, batch=data.x_p_batch)
-                x_n = self.layers[1](data.x_n, edge_index=data.edge_index_n, batch=data.x_n_batch)
-                output = self.layers[2](x_n=x_n, x_p=x_p, x_n_batch=data.x_n_batch, x_p_batch=data.x_p_batch)
 
         elif 'gnn_note_attn' in self.func:
             if 'inter' in self.type:
