@@ -3,15 +3,11 @@ import networkx as nx
 import numpy as np
 from scipy import sparse
 import torch, sys
-sys.path.append('/data/project/yinhuapark/scripts/models/ssl/ssl_make_graphs')
+sys.path.append('../ssl_make_graphs')
 from PairData import PairData
 pd.set_option('display.max_columns', None)
-import seaborn as sns
-import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler
 import os.path as osp, os
 from tqdm import tqdm
-from pytorch_pretrained_bert import BertTokenizer, BertModel, BertForMaskedLM
 
 
 def combine_same_word_pair(df, col_name):
@@ -109,14 +105,10 @@ class ConstructDatasetByDocs():
         self.word_embeddings = {}
         if pt == "":
             print('import glove.6B.300d pretrained word representation...')
-            with open('/data/project/yinhuapark/scripts/models/ssl/ssl_graphmodels/config/glove.6B.300d.txt', 'r') as f:
+            with open('../ssl_graphmodels/config/glove.6B.300d.txt', 'r') as f:
                 for line in f.readlines():
                     data = line.split()
                     self.word_embeddings[str(data[0])] = list(map(float, data[1:]))
-        elif pt == 'bert':
-            print('import bert-base-uncased pretrained model...')
-            # self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-            # self.pretrained_model = BertModel.from_pretrained('bert-base-uncased')
         else:
             print('pre trained is not available!')
 
@@ -197,19 +189,10 @@ class ConstructDatasetByDocs():
                 edge_index_n, _, x_n, batch_n, pos_n = graph_to_torch_sparse_tensor(G_n, node_attr=['paragraph_id',
                                                                                                     'node_pos'])
                 y_n = torch.from_numpy(np.array(y_n_list)).to(torch.long)
-
-                # print(x_n, edge_index_n, y_n, batch_n)
-                # print(x_p, edge_index_p, y_p, edge_attrs_p)
                 data = PairData(x_n, edge_index_n, y_n, batch_n, pos_n, x_p, edge_index_p, y_p, edge_attrs_p)
-                # assert data.x_p.squeeze().max().item() < len(self.dictionary)
                 Data_list.append(data)
 
         return Data_list
 
 if __name__ == '__main__':
-    raw_path = '/data/project/yinhuapark/DATA_RAW/mr/'
-    pre_path = '/data/project/yinhuapark/DATA_PRE/mr'
-    dictionary = open(os.path.join('/data/project/yinhuapark/DATA_RAW', 'mr', 'bert_mr_vocab.txt')).read().split()
-
-    cdbn = ConstructDatasetByDocs(pre_path, 'test', dictionary, pt='bert')
-    data_list = cdbn.construct_datalist_bert()
+    pass

@@ -1,7 +1,4 @@
 from torch_geometric.data import Data
-import torch
-from torch_geometric.data import DataLoader
-from torch_geometric.data import Dataset
 
 class PairData(Data):
     def __init__(self, x_n=None, edge_index_n=None, y_n=None, batch_n=None, pos_n=None,

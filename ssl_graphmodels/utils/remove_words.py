@@ -11,8 +11,8 @@ from nltk.stem import WordNetLemmatizer
 from collections import Counter
 from nltk.corpus import stopwords
 
-raw_path = '/data/project/yinhuapark/DATA_RAW/'
-pre_path = '/data/project/yinhuapark/DATA_PRE'
+raw_path = '.'
+pre_path = '.'
 
 
 split = 'test'

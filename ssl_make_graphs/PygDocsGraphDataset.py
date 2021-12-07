@@ -5,7 +5,7 @@ import os.path as osp
 import torch
 import numpy as np
 from gensim.models import Word2Vec
-sys.path.append('/data/project/yinhuapark/scripts/models/ssl/ssl_make_graphs')
+sys.path.append('../ssl_make_graphs')
 from ConstructDatasetByDocs import *
 from tqdm import tqdm
 import argparse
@@ -15,9 +15,9 @@ from torch_geometric.data import DataLoader
 from torch_geometric.nn import global_add_pool as gap
 
 
-IMDB_PATH = '/data/project/yinhuapark/IMDB'
-PRE_PATH = '/data/project/yinhuapark/DATA_PRE'
-RAW_PATH = '/data/project/yinhuapark/DATA_RAW'
+IMDB_PATH = ''
+PRE_PATH = ''
+RAW_PATH = ''
 
 
 
@@ -131,16 +131,4 @@ def statistic(train_loader, test_loader):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description="Create in-memory dataset.")
-
-    parser.add_argument('--raw_path', type=str, default='/data/project/yinhuapark/DATA_RAW/')
-    parser.add_argument('--task', type=str, default='mr' , help='task name: [20ng]')
-    args, _ = parser.parse_known_args()
-
-    dict_path = '{}_vocab.txt'.format(args.task)
-    dictionary = open(os.path.join(args.raw_path, args.task, dict_path)).read().split()
-
-    print('load test data...')
-    test_set = PygDocsGraphDataset(name=args.task, split='test', dic=dictionary)
-    print('load train data...')
-    train_set = PygDocsGraphDataset(name=args.task, split='train', dic=dictionary)
+    pass
