@@ -1,7 +1,7 @@
 # Sparse Structure Learning via Graph Neural Networks for inductive document classification
 
 <p align="center">
-  <img src="TextSSL.pdf" />
+  <img src="TextSSL.png" />
 </p>
 
 
