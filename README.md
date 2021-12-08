@@ -5,7 +5,7 @@
 </p>
 
 
-## Make graph dataset!
+## Make graph dataset
 
 1. create co-occurrence graph for datasets. 
     ```
@@ -18,7 +18,7 @@
     ```
 
 
-## Reproduce! 
+## Reproduce
 
     python ssl_graphmodels/pyg_models/train_docs.py
 
