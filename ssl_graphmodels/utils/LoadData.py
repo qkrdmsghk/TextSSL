@@ -82,7 +82,7 @@ class LoadDocsData():
         if pretrained == 'bert':
             self.dic_path = 'bert_{}_vocab.txt'.format(dict_name)
 
-        self.dictionary = open(os.path.join('/data/project/yinhuapark/DATA_RAW', dict_name, self.dic_path)).read().split()
+        self.dictionary = open(os.path.join('---input directory---', dict_name, self.dic_path)).read().split()
 
     class Handle_data(object):
         def __init__(self, type, pretrained):
@@ -99,7 +99,6 @@ class LoadDocsData():
             data.x_n = data.x_n[:, 1:].to(torch.float32)
             data.x_p = data.x_p[:, 1:].to(torch.float32)
             if self.type == 'pr':
-
                 '''
                 heterogeneous graph construction!
                 need add pr(paragraph nodes) and pr-w edges info to PairData object!
@@ -114,9 +113,6 @@ class LoadDocsData():
                 row = torch.cat([row, paragraph_node, word_node]) # source node
                 col = torch.cat([col, word_node, paragraph_node]) # target node
 
-                # scatter add word nodes?
-                # paragraph_emb = scatter_add(data.x_p[data.pos_n], data.batch_n, dim=0)
-                # or randomize pr nodes?
                 paragraph_emb = torch.from_numpy(np.random.uniform(-0.01, 0.01, (data.y_n.size(0), data.x_p.size(1)))).to(data.x_p.dtype)
 
                 data.x_pr = torch.cat([data.x_p, paragraph_emb])
@@ -147,44 +143,7 @@ class LoadDocsData():
 
                 assert data.x_gr.size(0) == data.edge_index_gr.max()+1
 
-
-            elif self.type == 'inter_only':
-                '''
-                connect inter edge!
-                only connect the same word in different sentence!
-                '''
-                row, col = data.edge_index_n
-                edge_mask = torch.full((row.size(0),), -1).to(torch.long)
-                a, b = data.x_n_id.unique(return_counts=True)
-                intersected_id = a[b>1]
-                a, b =  (data.x_n_id == intersected_id.unsqueeze(-1)).nonzero(as_tuple=True)
-                row_ =  []
-                col_ = []
-                edge_mask_ = []
-                if intersected_id.size(0)>0:
-                    for i in range(intersected_id.size(0)):
-                        nodes = torch.combinations(b[a==i], with_replacement=False).T
-                        i = torch.tensor([i])
-                        row_.append(nodes[0])
-                        col_.append(nodes[1])
-                        col_.append(nodes[0])
-                        row_.append(nodes[1])
-                        for j in range(nodes.size(1)*2):
-                            edge_mask_.append(i)
-
-                    edge_mask_ = torch.cat(edge_mask_).to(torch.long)
-                    row_ = torch.cat(row_)
-                    col_ = torch.cat(col_)
-                    row = torch.cat([row_, row])
-                    col = torch.cat([col_, col])
-                    edge_mask = torch.cat([edge_mask_, edge_mask])
-                    data.edge_index_n = torch.stack([row, col])
-
-                data.edge_mask = edge_mask
-                assert data.edge_index_n.size(1) == data.edge_mask.size(0)
-                    # print('intersected_nodes_{}'.format(intersected_id.size(0)))
-                    # print('added_edges_{}'.format(row_.size(0)))
-
+                
             elif self.type == 'inter_all':
                 '''
                 connect inter edge!
