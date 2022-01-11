@@ -4,39 +4,19 @@ from torch.nn import Parameter
 from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_pool
 import sys
 sys.path.append('../ssl_graphmodels')
-from utils.ATGCConv_GCN import ATGCConv_GCN, GINConv, GATConv, CombConv_GCN, LEConv, GCNConv
-from torch.nn import Sequential as Seq, Linear as Lin
-from torch_geometric.nn import BatchNorm as BN
+from utils.SSL_GCN import SSL_GCN
 from torch_geometric.utils import softmax, add_remaining_self_loops
 
-
-def statistic(edge_weights, temperature, weightss, thresholds):
-    sample_prob = torch.distributions.relaxed_bernoulli.RelaxedBernoulli(temperature, probs=weightss)
-    y = sample_prob.rsample()
-    y_soft = y
-    y_hard = (y > thresholds).to(y.dtype)
-    y = (y_hard - y).detach() + y
-    intra_edges = y[edge_weights == 1]
-    inter_edges = y[edge_weights == 0]
-
-    print('added inter_edges #{}'.format((inter_edges[inter_edges == 1].shape[0]) / (inter_edges.shape[0])))
-    print('removed intra_edges #{}'.format((intra_edges[intra_edges == 0].shape[0]) / (intra_edges.shape[0])))
-
 class StructureLearinng(torch.nn.Module):
-    '''
-    sparse: {'soft', 'gumbel_hard', 'sparse_hard'}
-    emb_type: {'1_hop', '2_hop', 'context', 'comb'}
-    '''
     def __init__(self, input_dim, sparse, emb_type='1_hop', threshold=0.5, temperature=0.5):
         super(StructureLearinng, self).__init__()
         self.att = Parameter(torch.Tensor(1, input_dim * 2))
         glorot(self.att.data)
-        # self.sparse_attention = Sparsemax()
         self.emb_layer = int(emb_type.split('_')[0]) - 1
         if self.emb_layer > 0:
             self.gnns = torch.nn.ModuleList()
             for i in range(self.emb_layer):
-                self.gnns.append(ATGCConv_GCN(input_dim, input_dim))
+                self.gnns.append(SSL_GCN(input_dim, input_dim))
 
         self.threshold = threshold
         self.temperature = temperature
@@ -67,16 +47,10 @@ class StructureLearinng(torch.nn.Module):
 
         edge_mask = edge_mask[col_id]
 
-        if self.sparse == 'sparse_hard':
-            edge_weight = self.sparse_attention(weights, col)
-        elif self.sparse == 'soft':
+        if self.sparse == 'soft':
             edge_weight = softmax(weights, col)
-        elif 'gumbel' in self.sparse:
-            if self.sparse == 'gumbel_hard':
-                weights = softmax(weights, col)
-            elif self.sparse == 'gumbel_hard_sig':
-                weights = torch.sigmoid(weights)
-
+        elif self.sparse == 'hard':
+            weights = softmax(weights, col)
             sample_prob = torch.distributions.relaxed_bernoulli.RelaxedBernoulli(self.temperature, probs=weights)
             y = sample_prob.rsample()
             y_soft = y
@@ -87,38 +61,25 @@ class StructureLearinng(torch.nn.Module):
             edge_weight[edge_weight==0] = inter_edges
             edge_mask[(edge_mask==0) & (y==1)] = layer+1
             intra_soft_edge = y_soft[edge_mask==-1]
+        else:
+            print('sparse operation is not found...')
 
         assert edge_index.size(1) == edge_weight.size(0)
-
         torch.cuda.empty_cache()
 
         return edge_index, edge_weight, y_soft, edge_mask, intra_soft_edge
 
 
 class GRAPHLayer(torch.nn.Module):
-    def __init__(self, input_dim, output_dim, dropout=0, act=torch.nn.ReLU(), bias=True, num_layer=2, func='', threshold='', temperature=''):
+    def __init__(self, input_dim, output_dim, func, dropout=0, act=torch.nn.ReLU(), bias=True, num_layer=2,  threshold=0.5, temperature=0.5):
         super(GRAPHLayer, self).__init__()
         self.dropout = dropout
         self.act = act
         self.num_layer = num_layer
         self.func = func
-        self.improved = False
         self.threshold = threshold
         self.temperature = temperature
-        if self.threshold == '':
-            self.threshold = 0.5
-        else:
-            self.threshold = float(self.threshold)
-
-        if self.temperature == '':
-            self.temperature = 0.5
-        else:
-            self.temperature = float(self.temperature)
-
-        if 'improved' in self.func:
-            self.improved = True
         self.weight = Parameter(torch.Tensor(input_dim, output_dim))
-
         if bias:
             self.bias = Parameter(torch.Tensor(output_dim))
         else:
@@ -127,24 +88,19 @@ class GRAPHLayer(torch.nn.Module):
         self.convs = torch.nn.ModuleList()
         self.sls = torch.nn.ModuleList()
         for _ in range(self.num_layer):
-
             if 'lin' in self.func:
                 self.Lin = True
             else:
                 self.Lin = False
-            self.convs.append(ATGCConv_GCN(output_dim, output_dim, improved = self.improved, Lin=self.Lin))
-
-            emb_type = '1_hop'
+            self.convs.append(SSL_GCN(output_dim, output_dim, Lin=self.Lin))
             if 'attn' in self.func:
+                sparse = ''
                 if 'soft' in self.func:
                     sparse = 'soft'
-                elif 'mine' in self.func:
-                    sparse = 'gumbel_hard'
-                else:
-                    sparse = 'sparse_hard'
-                self.sls.append(StructureLearinng(output_dim, sparse, emb_type, self.threshold, self.temperature))
+                elif 'gumbel' in self.func:
+                    sparse = 'hard'
+                self.sls.append(StructureLearinng(output_dim, sparse, threshold=self.threshold, temperature=self.temperature))
                 torch.cuda.empty_cache()
-
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -161,7 +117,6 @@ class GRAPHLayer(torch.nn.Module):
         x = torch.nn.functional.dropout(x, self.dropout, training=self.training)
 
         if 'attn' in self.func:
-
             edge_mask = kwargs['edge_mask']
             # regard self as intra nodes! --> -1
             edge_weight = torch.ones((edge_mask.size(0), ), dtype=torch.float, device=edge_mask.device)
@@ -179,9 +134,7 @@ class GRAPHLayer(torch.nn.Module):
             inter_edge_indexs = []
             edge_masks = []
             for i in range(self.num_layer):
-
                 x = self.act(self.convs[i](x, edge_index[:, edge_weight!=0], edge_weight=edge_weight[edge_weight!=0]))
-
                 if i != self.num_layer-1:
                     edge_index, edge_weight, soft_weight, edge_mask, intra_soft_edge = self.sls[i](x, edge_index, edge_weight, edge_mask, layer=i)
                     soft_weights.append(soft_weight[edge_mask==i+1])
@@ -198,7 +151,6 @@ class GRAPHLayer(torch.nn.Module):
                 soft_weights = torch.cat(soft_weights)
                 inter_edge_indexs = torch.cat(inter_edge_indexs, 1)
                 edge_masks = torch.cat(edge_masks)
-
                 assert inter_edge_indexs.shape[1] == soft_weights.shape[0] == edge_masks.shape[0]
                 exp_dict = {'edge_index': inter_edge_indexs, 'edge_weight': soft_weights, 'edge_mask': edge_masks}
                 return x, exp_dict
@@ -249,12 +201,7 @@ class READOUTLayer(torch.nn.Module):
         self.aggr = aggr
         self.emb_weight = Parameter(torch.Tensor(input_dim, input_dim))
         self.emb_bias = Parameter(torch.Tensor(input_dim))
-        if 'attn' in self.aggr:
-            self.att_weight = Parameter(torch.Tensor(input_dim, 1))
-            self.att_bias = Parameter(torch.Tensor(1))
 
-        if self.func == 'two_tower':
-            input_dim = input_dim*2
 
         self.mlp_weight = Parameter(torch.Tensor(input_dim, output_dim))
         self.mlp_bias = Parameter(torch.Tensor(output_dim))
@@ -266,9 +213,6 @@ class READOUTLayer(torch.nn.Module):
         glorot(self.mlp_weight)
         zeros(self.emb_bias)
         zeros(self.mlp_bias)
-        if 'attn' in self.aggr:
-            glorot(self.att_weight)
-            zeros(self.att_bias)
 
     def global_pooling(self, x, batch):
         x_emb = self.act(torch.matmul(x, self.emb_weight)+self.emb_bias)
@@ -279,41 +223,13 @@ class READOUTLayer(torch.nn.Module):
             x = global_mean_pool(x_emb, batch)
         elif self.aggr == 'max':
             x = global_max_pool(x_emb, batch)
-        elif self.aggr == 'attn':
-            att = torch.nn.functional.sigmoid(torch.matmul(x, self.att_weight) + self.att_bias)
-            x = x_emb*att
-            x = global_add_pool(x, batch)
-        elif self.aggr == 'attn_1':
-            att = torch.nn.functional.sigmoid(torch.matmul(x, self.att_weight) + self.att_bias)
-            x = x_emb*att
-            x_mean = global_mean_pool(x, batch)
-            x_max = global_max_pool(x, batch)
-            x = x_max + x_mean
 
         return x
 
     def forward(self, input=None, **kwargs):
-
-
-
-        if self.func == 'two_tower':
-            x_n = kwargs['x_n']
-            x_n_batch = kwargs['x_n_batch']
-            x_p = kwargs['x_p']
-            x_p_batch = kwargs['x_p_batch']
-            x_n = self.global_pooling(x_n, x_n_batch)
-            x_p = self.global_pooling(x_p, x_p_batch)
-            x = torch.cat([x_n, x_p], 1)
-
-        else:
-            x = input
-            batch = kwargs['batch']
-            # embedding
-            x = self.global_pooling(x, batch)
-
-        # dropout
+        x = input
+        batch = kwargs['batch']
+        x = self.global_pooling(x, batch)
         x = torch.nn.functional.dropout(x, self.dropout, training=self.training)
-
-        # linear layer
         x = torch.matmul(x, self.mlp_weight) + self.mlp_bias
         return x

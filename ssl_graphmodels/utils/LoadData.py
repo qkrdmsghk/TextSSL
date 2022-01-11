@@ -1,6 +1,6 @@
 import sys, os
-sys.path.append('/data/project/yinhuapark/scripts/models/ssl/ssl_make_graphs')
-# from PygNotesGraphDataset import PygNotesGraphDataset as PNGD
+Your_path = '/data/project/yinhuapark/ssl/'
+sys.path.append(Your_path+'ssl_make_graphs')
 from PygDocsGraphDataset import PygDocsGraphDataset as PDGD
 from torch_geometric.data import DataLoader
 import torch
@@ -10,6 +10,7 @@ import argparse
 from gensim.models import Word2Vec
 import pandas as pd
 from tqdm import tqdm
+
 
 def show_statisctic(train_set, test_set):
     # min_len = 10000
@@ -56,12 +57,13 @@ def show_statisctic(train_set, test_set):
     avg_words = np.array(training_words+test_words).mean()
     avg_disjoint_words = np.array(training_jisjoint_words+test_disjoint_words).mean()
 
-    print('training_vocab {}, test_vocab {}, intersected_vocab {}, new word porportion {}'.format(len(training_vocab), len(test_vocab), len(intersected_vocab), 1-(len(intersected_vocab)/len(test_vocab))))
-    print('training_sent_num {}, test_sent_num {}, all_sent_num {}'.format(avg_trianing_sent_num, avg_test_sent_num, avg_sent_num))
-    print('training_joint_words {}, test_joint_words {}, all_joint_words {}'.format(avg_training_words, avg_test_words, avg_words))
-    print('training_disjoint_words {}, test_disjoint_words {}, all_disjoint_words {}'.format(avg_training_disjoint_words, avg_test_disjoint_words, avg_disjoint_words))
-    print('training_imbalanced_rate {}' 'test_imbalanced_rate {} all_imbalanced_rate {}'.format(train_p, test_p, (train_p+test_p)) )
-    a = 0
+
+    print('\n statistic on datasets ... \n')
+    print('training_vocab {}, test_vocab {}, intersected_vocab {}, new word porportion {:.4f}'.format(len(training_vocab), len(test_vocab), len(intersected_vocab), 1-(len(intersected_vocab)/len(test_vocab))))
+    print('training_sent_num {:.4f}, test_sent_num {:.4f}, all_sent_num {:.4f}'.format(avg_trianing_sent_num, avg_test_sent_num, avg_sent_num))
+    print('training_joint_words {:.4f}, test_joint_words {:.4f}, all_joint_words {:.4f}'.format(avg_training_words, avg_test_words, avg_words))
+    print('training_disjoint_words {:.4f}, test_disjoint_words {:.4f}, all_disjoint_words {:.4f}'.format(avg_training_disjoint_words, avg_test_disjoint_words, avg_disjoint_words))
+    print('training_imbalanced_rate {:.4f}, test_imbalanced_rate {:.4f}, all_imbalanced_rate {:.4f}'.format(train_p, test_p, (train_p+test_p)) )
 
 
 
@@ -74,15 +76,9 @@ class LoadDocsData():
         self.train_set = []
         self.val_set = []
         self.test_set = []
-        if '20ng' in name:
-            dict_name = '20ng'
-        else:
-            dict_name = name
-        self.dic_path = '{}_vocab.txt'.format(dict_name)
-        if pretrained == 'bert':
-            self.dic_path = 'bert_{}_vocab.txt'.format(dict_name)
+        self.dic_path = '{}_vocab.txt'.format(name)
 
-        self.dictionary = open(os.path.join('---input directory---', dict_name, self.dic_path)).read().split()
+        self.dictionary = open(os.path.join(Your_path+'re-extract_data/DATA_RAW', name, self.dic_path)).read().split()
 
     class Handle_data(object):
         def __init__(self, type, pretrained):
@@ -98,53 +94,8 @@ class LoadDocsData():
             data.x_p_id = data.x_p[:, 0].to(torch.long)
             data.x_n = data.x_n[:, 1:].to(torch.float32)
             data.x_p = data.x_p[:, 1:].to(torch.float32)
-            if self.type == 'pr':
-                '''
-                heterogeneous graph construction!
-                need add pr(paragraph nodes) and pr-w edges info to PairData object!
-                mask
-                '''
-                row, col = data.edge_index_p
-                num_nodes = data.x_p.size(0)
 
-                paragraph_node = data.batch_n + num_nodes
-                word_node = data.pos_n
-
-                row = torch.cat([row, paragraph_node, word_node]) # source node
-                col = torch.cat([col, word_node, paragraph_node]) # target node
-
-                paragraph_emb = torch.from_numpy(np.random.uniform(-0.01, 0.01, (data.y_n.size(0), data.x_p.size(1)))).to(data.x_p.dtype)
-
-                data.x_pr = torch.cat([data.x_p, paragraph_emb])
-                data.x_pr_mask = torch.cat([torch.full((data.x_p.shape[0],),-1).to(torch.long), data.y_n.squeeze(dim=1)], dim=0)
-                data.edge_index_pr = torch.stack([row, col])
-                # direct edge of word node -> paragraph node.
-                data.edge_index_pr_d = torch.cat([data.edge_index_p, torch.stack([word_node, paragraph_node])], dim=1)
-                data.edge_index_pr_d_ = torch.cat([data.edge_index_p, torch.stack([paragraph_node, word_node])], dim=1)
-                assert data.x_pr.size(0) == data.edge_index_pr.max()+1 == data.edge_index_pr_d.max()+1 == data.x_pr_mask.size(0)
-
-            elif self.type == 'gr':
-                '''
-                heterogeneous graph construction!
-                need add gr(graph nodes) and gr-w edges info to PairData object!
-                mask
-                '''
-                row, col = data.edge_index_p
-                gr_emb = torch.from_numpy(np.random.uniform(-0.01, 0.01, (data.y_p.size(0), data.x_p.size(1)))).to(data.x_p.dtype)
-                data.x_gr = torch.cat([data.x_p, gr_emb])
-                data.x_gr_mask = torch.cat([torch.full((data.x_p.shape[0],),-1).to(torch.long), torch.tensor([1])], dim=0)
-
-                data.edge_index_gr = torch.stack([row, col])
-                num_nodes = torch.tensor([data.x_p.size(0)])
-                word_nodes = torch.arange(data.x_p.size(0))
-                row = torch.cat([row, num_nodes, word_nodes]) # source node
-                col = torch.cat([col, word_nodes, num_nodes]) # target node
-                data.edge_index_gr = torch.stack([row, col])
-
-                assert data.x_gr.size(0) == data.edge_index_gr.max()+1
-
-                
-            elif self.type == 'inter_all':
+            if self.type == 'inter_all':
                 '''
                 connect inter edge!
                 connect all the words in 1-hop neighbor sentence!
@@ -164,14 +115,13 @@ class LoadDocsData():
                 data.edge_mask = torch.cat([edge_mask_, edge_mask])
                 data.edge_index_n = torch.stack([row, col])
 
-            # else:
-            #     print('NO special data type!!')
+            else:
+                print('NO special data type!!')
 
             return data
 
     def split_train_val_data(self, seed, tr_split):
         np.random.seed(seed)
-
         cs = pd.DataFrame(self.train_set.data.y_p.tolist())[0].value_counts().to_dict()
         train_id = []
         cs_num = {}
@@ -193,17 +143,15 @@ class LoadDocsData():
 
     def get_train_test(self, batch_size, seed, tr_split):
 
-        print('load test data...')
+        print('\nload test data...')
         self.test_set = PDGD(name=self.name, split='test', dic=self.dictionary, pt=self.pretrained, transform=self.Handle_data(self.type, self.pretrained))
-        # x = [data for data in self.test_set]
         print(len(self.test_set))
         print('load train data...')
         self.train_set = PDGD(name=self.name, split='train', dic=self.dictionary, pt=self.pretrained, transform=self.Handle_data(self.type, self.pretrained))
-
+        print(len(self.train_set))
 
         # show_statisctic(self.train_set, self.test_set)
         self.train_set, self.val_set = self.split_train_val_data(seed, tr_split)
-        print(len(self.train_set), len(self.val_set))
         assert self.val_set.data.y_p.unique().size(0) == \
                self.train_set.data.y_p.unique().size(0) == \
                self.test_set.data.y_p.unique().size(0)
@@ -235,13 +183,12 @@ def label_distribution(data_set):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description="GNN for MRSA prediction.")
-    parser.add_argument('--name', type=str, default='mr')
-    parser.add_argument('--type', type=str, default='inter_only')
-    parser.add_argument('--pretrained', type=str, default='bert')
-    # parser.add_argument('--memo', type=str, default='t-')
+    parser = argparse.ArgumentParser(description="Load data")
+    parser.add_argument('--name', type=str, default='R52')
+    parser.add_argument('--type', type=str, default='inter_all')
+    parser.add_argument('--pretrained', type=str, default='')
 
     args, _ = parser.parse_known_args()
-    loader = LoadDocsData(name=args.name, type=args.type, pretrained='bert')
+    loader = LoadDocsData(name=args.name, type=args.type, pretrained='')
     train_loader, val_loader, test_loader, n_class = loader.get_train_test(batch_size=1, seed=2, tr_split=1.0)
 

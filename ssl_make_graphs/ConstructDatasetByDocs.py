@@ -3,7 +3,9 @@ import networkx as nx
 import numpy as np
 from scipy import sparse
 import torch, sys
-sys.path.append('../ssl_make_graphs')
+Your_path = '/data/project/yinhuapark/ssl/'
+sys.path.append(Your_path+'ssl_make_graphs')
+sys.path.append(Your_path+'ssl_graphmodels')
 from PairData import PairData
 pd.set_option('display.max_columns', None)
 import os.path as osp, os
@@ -74,26 +76,6 @@ def set_word_id_to_node(G, dictionary, node_emb, word_embeddings):
     return G
 
 
-
-
-def set_word_id_to_node_bert(G, dictionary, node_emb, word_embeddings):
-    for node in G:
-        if node in dictionary:
-            ind = np.array([dictionary.index(node)])
-            if len(word_embeddings) == 0:
-                emb = np.random.uniform(-0.01, 0.01, 768).reshape(768)
-            else:
-                emb = word_embeddings[word_embeddings[:, -2] == node][:, :-2].squeeze().reshape(768).astype(float)
-            emb = np.concatenate([ind, emb]).reshape(769)
-            assert emb.shape[0] == 769
-            G.nodes[node][node_emb] = emb
-        else:
-            print('no!!')
-            assert node in dictionary
-    return G
-
-
-
 class ConstructDatasetByDocs():
     def __init__(self, pre_path, split, dictionary, pt):
         self.pre_path = pre_path
@@ -104,8 +86,8 @@ class ConstructDatasetByDocs():
         self.all_cats = []
         self.word_embeddings = {}
         if pt == "":
-            print('import glove.6B.300d pretrained word representation...')
-            with open('../ssl_graphmodels/config/glove.6B.300d.txt', 'r') as f:
+            print('importing glove.6B.300d pretrained word representation...')
+            with open(Your_path+'ssl_graphmodels/config/glove.6B.300d.txt', 'r') as f:
                 for line in f.readlines():
                     data = line.split()
                     self.word_embeddings[str(data[0])] = list(map(float, data[1:]))
@@ -153,45 +135,6 @@ class ConstructDatasetByDocs():
                 data = PairData(x_n, edge_index_n, y_n, batch_n, pos_n, x_p, edge_index_p, y_p, edge_attrs_p)
                 assert data.x_p.squeeze().max().item() < len(self.dictionary)
                 Data_list.append(data)
-        return Data_list
-
-    def construct_datalist_bert(self):
-        Data_list = []
-        cooc_path = osp.join(self.pre_path, self.split + '_cooc_bert')
-        for y_id, y in enumerate(os.listdir(cooc_path)):
-            patients = list(filter(lambda x: x.find('bert_embs') == -1, os.listdir(os.path.join(cooc_path, y))))
-            for patient in tqdm(patients, desc='Iterating over patients in {}_{}_cooc_bert'.format(y, self.split)):
-                p_emb_df = pd.read_csv(os.path.join(cooc_path, y, patient+'_bert_embs'), sep='\t', header=0)
-
-                p_df = pd.read_csv(osp.join(cooc_path, y, patient), sep='\t', header=0)
-                G_p = self.generate_doc_graph(p_df)
-                G_p = set_word_id_to_node_bert(G_p, self.dictionary, node_emb='node_emb',
-                                          word_embeddings={})
-                edge_index_p, edge_attrs_p, x_p, _, _ = graph_to_torch_sparse_tensor(G_p, edge_attr='edge_attr')
-                y_p = torch.from_numpy(np.array([y_id])).to(torch.long)
-
-                G_n_list = []
-                y_n_list = []
-                for n_id, n_df in p_df.groupby(by='paragraph_id'):
-                    n_emb_df = p_emb_df[p_emb_df['paragraph_id']==n_id].values
-                    n_df = n_df.dropna(axis=0)
-                    G_n = nx.from_pandas_edgelist(n_df, 'word1', 'word2', ['freq'])
-                    attrs = {}
-                    for node in G_n:
-                        attrs[node] = {'node_pos': list(G_p.nodes).index(node), 'paragraph_id': n_id}
-                    nx.set_node_attributes(G_n, attrs)
-                    G_n = set_word_id_to_node_bert(G_n, self.dictionary, node_emb='node_emb',
-                                              word_embeddings=n_emb_df)
-                    G_n_list.append(G_n)
-                    y_n_list.append([n_id])
-
-                G_n = nx.disjoint_union_all(G_n_list)
-                edge_index_n, _, x_n, batch_n, pos_n = graph_to_torch_sparse_tensor(G_n, node_attr=['paragraph_id',
-                                                                                                    'node_pos'])
-                y_n = torch.from_numpy(np.array(y_n_list)).to(torch.long)
-                data = PairData(x_n, edge_index_n, y_n, batch_n, pos_n, x_p, edge_index_p, y_p, edge_attrs_p)
-                Data_list.append(data)
-
         return Data_list
 
 if __name__ == '__main__':

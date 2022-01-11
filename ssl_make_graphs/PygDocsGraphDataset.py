@@ -1,36 +1,27 @@
 from torch_geometric.data import InMemoryDataset
-import pandas as pd
-import shutil, os, sys
+import os, sys
 import os.path as osp
 import torch
-import numpy as np
-from gensim.models import Word2Vec
-sys.path.append('../ssl_make_graphs')
+Your_path = '/data/project/yinhuapark/ssl/'
+sys.path.append(Your_path+'ssl_make_graphs')
+
+
 from ConstructDatasetByDocs import *
-from tqdm import tqdm
 import argparse
-import matplotlib.pyplot as plt
-import seaborn as sns
-from torch_geometric.data import DataLoader
-from torch_geometric.nn import global_add_pool as gap
-
-
-IMDB_PATH = ''
-PRE_PATH = ''
-RAW_PATH = ''
-
 
 
 class PygDocsGraphDataset(InMemoryDataset):
     def __init__(self, name, split, dic, pt, transform=None, pre_transform=None):
+        imdb_path = Your_path+'re-extract_data/IMDB'
+        pre_path = Your_path+'re-extract_data/DATA_PRE'
         if pt == '':
-            self.imdb_path = osp.join(IMDB_PATH, name)
+            self.imdb_path = osp.join(imdb_path, name)
         else:
-            self.imdb_path = osp.join(IMDB_PATH, name+'_'+pt)
+            self.imdb_path = osp.join(imdb_path, name+'_'+pt)
         self.split = split
         self.dic = dic
         self.pt = pt
-        self.pre_path = osp.join(PRE_PATH, name)
+        self.pre_path = osp.join(pre_path, name)
         super(PygDocsGraphDataset, self).__init__(self.imdb_path, transform, pre_transform)
         self.data, self.slices = torch.load(osp.join(self.processed_dir, f'{self.split}.pt'))
 
@@ -65,70 +56,16 @@ class PygDocsGraphDataset(InMemoryDataset):
 
 
 
-
-def statistic(train_loader, test_loader):
-    note_dist = []
-    x_n_dist = []
-    x_p_dist = []
-    # x_p_1_dist = []
-    # x_p_0_dist = []
-    edge_n_dist = []
-    edge_p_dist = []
-    note_node_dist = []
-    y_dist = []
-
-    for data in train_loader:
-        note_words = (gap(torch.ones_like(data.batch_n), data.batch_n).numpy().tolist())
-        # assert data.y_n.shape[0] == len(gap(torch.ones_like(data.batch_n), data.batch_n).numpy().tolist())
-        note_dist.append(data.y_n.shape[0])
-        x_n_dist.append(data.x_n.shape[0])
-        x_p_dist.append(data.x_p.shape[0])
-        edge_n_dist.append(data.edge_index_n.shape[1])
-        edge_p_dist.append(data.edge_index_p.shape[1])
-        note_node_dist += note_words
-        # print(data.y_p[:, 1].item())
-        # if data.y_p[:, 1].item() == 1:
-        #     x_p_1_dist.append(data.x_p.shape[0])
-        # else:
-        #     x_p_0_dist.append(data.x_p.shape[0])
-        y_dist.append(data.y_p.item())
-
-    for data in test_loader:
-        note_words = (gap(torch.ones_like(data.batch_n), data.batch_n).numpy().tolist())
-        # assert data.y_n.shape[0] == len(gap(torch.ones_like(data.batch_n), data.batch_n).numpy().tolist())
-        note_dist.append(data.y_n.shape[0])
-        x_n_dist.append(data.x_n.shape[0])
-        x_p_dist.append(data.x_p.shape[0])
-        edge_n_dist.append(data.edge_index_n.shape[1])
-        edge_p_dist.append(data.edge_index_p.shape[1])
-        note_node_dist += note_words
-        # print(data.y_p[:, 1].item())
-        # if data.y_p[:, 1].item() == 1:
-        #     x_p_1_dist.append(data.x_p.shape[0])
-        # else:
-        #     x_p_0_dist.append(data.x_p.shape[0])
-        y_dist.append(data.y_p.item())
-    nodes = np.array(x_p_dist)
-    print('..........# Max Vocab: {}...........'.format(np.max(nodes)))
-    print('..........# Min Vocab: {}...........'.format(np.min(nodes)))
-    print('..........# Avg Vocab: {}...........'.format(np.mean(nodes)))
-
-
-
-    title = 'nodes distribution'
-    sns.set_style('darkgrid')
-    sns.set_style('ticks')
-
-    # sns.distplot(y_dist)
-    sns.distplot(x_p_dist, label='#joint words')
-    sns.distplot(x_n_dist, label='#disjoint words')
-    plt.legend(title='task: '+args.name)
-    plt.title(title)
-    # plt.xlim(-1000,6000)
-    sns.despine(trim=True)
-    plt.show()
-
-
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Construct In-Memory Datasets")
+    parser.add_argument('--name', type=str, default='R52')
+    parser.add_argument('--raw_path', type=str, default=Your_path+'re-extract_data/DATA_RAW')
+    parser.add_argument('--imdb_path', type=str, default=Your_path+'re-extract_data/IMDB')
 
-    pass
+
+    args, _ = parser.parse_known_args()
+    if not os.path.exists(args.imdb_path):
+        os.makedirs(args.imdb_path)
+
+    vocab = open(os.path.join(args.raw_path, args.name, args.name+'_vocab.txt')).read().split()
+    test_set = PygDocsGraphDataset(name=args.name, split='test', dic=vocab, pt='')
