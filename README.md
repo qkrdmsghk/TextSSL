@@ -1,9 +1,12 @@
-# Sparse Structure Learning via Graph Neural Networks for inductive document classification [[arXiv]](https://arxiv.org/abs/2112.06386)
-
-<p align="center">
-  <img src="TextSSL.png" />
+<h1 align="left">Sparse Structure Learning via Graph Neural Networks for inductive document classification</h1>
+<p align="left">
+    <a href="https://arxiv.org/abs/2112.06386"><img src="https://img.shields.io/badge/arXiv-2202.05441-b31b1b.svg" alt="Paper"></a>
+    <a href="https://github.com/qkrdmsghk/TextSSL"><img src="https://img.shields.io/badge/-Github-grey?logo=github" alt="Github"></a>
+    <a href="https://ojs.aaai.org/index.php/AAAI/article/view/21366"> <img alt="License" src="https://img.shields.io/static/v1?label=Pub&message=AAAI%2722&color=blue"> </a>
+    <a href="https://github.com/qkrdmsghk/TextSSL/blob/main/LICENSE"> <img alt="License" src="https://img.shields.io/github/license/qkrdmsghk/TextSSL?color=blue"> </a>
 </p>
-
+<p align="left"><img src="TextSSL.png" width=80% height=80%></p>
+<p align="left"><em>Figure 1.</em> The architecture of TextSSL.</p>
 
 ## About data
 We use the same benchmark datasets that are used in Yao, Mao, and Luo 2019, 
@@ -43,3 +46,21 @@ You can download the dataset [*here*](http://disi.unitn.it/moschitti/corpora/Reu
 ## Train
 ```
 python ssl_graphmodels/pyg_models/train_docs.py --name R8
+```
+
+## Reference
+If you find our paper and repo useful, please cite our paper:
+
+```bibtex
+@inproceedings{piao2022sparse,
+  title={Sparse Structure Learning via Graph Neural Networks for Inductive Document Classification},
+  author={Piao, Yinhua and Lee, Sangseon and Lee, Dohoon and Kim, Sun},
+  booktitle={Proceedings of the AAAI Conference on Artificial Intelligence},
+  volume={36},
+  number={10},
+  pages={11165--11173},
+  year={2022}
+}
+```
+
+#### *The readme is inspired by [GSAT](https://github.com/Graph-COM/GSAT).*
