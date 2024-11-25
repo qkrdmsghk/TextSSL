@@ -16,7 +16,7 @@ Thanks for their work.
 For R8 and R52 datasets, they are only provided by a preprocessed version that lack punctuations and do not have explicit sample names. 
 Since we use documents with sentence segmentation information to construct graph, we re-extract the data from original Reuters-21578 dataset.
 
-You can download the dataset [*here*](http://disi.unitn.it/moschitti/corpora/Reuters21578-Apte-115Cat.tar.gz): 
+You can download the dataset [*here*](https://github.com/qkrdmsghk/TextSSL/blob/master/Reuters21578-Apte-115Cat.zip): 
 
 1. re-extract R8 and R52 datasets.
     ```
